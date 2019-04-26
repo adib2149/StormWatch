@@ -73,8 +73,8 @@
                 <div class="col s12 m9 l9">
                     <div class="card-panel" id="map-div">
                         <p align="center" style="font-size: 20px;">What is the <span
-                                style="color: #ff0000">severity</span> of tornadoes in WI,
-                            US over last 10 years?</p>
+                                style="color: #ff0000">severity</span> of tornadoes in __,
+                            US from ____ to ____?</p>
                     </div>
                 </div>
                 <div class="col s12 m3 l3">
@@ -82,17 +82,14 @@
                         <p style="font-size: 18px;">Filters</p>
                         <br><br>
                         <label>
-                            <input type="checkbox" class="filled-in" checked="checked" />
+                            <input type="checkbox" class="filled-in" id="mag-checkbox" />
                             <span>By Magnitude</span>
                         </label>
-                        <form action="#">
-                            <p class="range-field">
-                                <input type="range" id="test5" min="0" max="5" />
-                            </p>
-                        </form>
+                        <div id="mag-slider"></div>
+                        <p id="mag-value">Magnitude: --</p>
                         <br><br>
                         <label>
-                            <input type="checkbox" class="filled-in" checked="checked" />
+                            <input type="checkbox" class="filled-in" id="yr-month-checkbox" />
                             <span>By Time</span>
                         </label>
                         <select class="browser-default">
@@ -127,14 +124,14 @@
 
         /*  This visualization was made possible by modifying code provided by:
 
-Scott Murray, Choropleth example from "Interactive Data Visualization for the Web" 
-https://github.com/alignedleft/d3-book/blob/master/chapter_12/05_choropleth.html   
-		
-Malcolm Maclean, tooltips example tutorial
-http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+        Scott Murray, Choropleth example from "Interactive Data Visualization for the Web" 
+        https://github.com/alignedleft/d3-book/blob/master/chapter_12/05_choropleth.html   
+                
+        Malcolm Maclean, tooltips example tutorial
+        http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
 
-Mike Bostock, Pie Chart Legend
-http://bl.ocks.org/mbostock/3888852  */
+        Mike Bostock, Pie Chart Legend
+        http://bl.ocks.org/mbostock/3888852  */
 
 
         //Width and height of map
@@ -150,9 +147,9 @@ http://bl.ocks.org/mbostock/3888852  */
         var path = d3.geo.path()               // path generator that will convert GeoJSON to SVG paths
             .projection(projection);  // tell path generator to use albersUsa projection
 
-
         // Define linear scale for output
         var color = d3.scale.linear()
+            .domain([1, 2, 3, 4, 5])
             .range(["rgb(68,118,4)", "rgb(107,212,37)", "rgb(233,206,44)", "rgb(254,98,29)", "rgb(221,64,58)"]);
 
         var legendText = ["1", "2", "3", "4", "5"];
@@ -172,103 +169,142 @@ http://bl.ocks.org/mbostock/3888852  */
             .attr("class", "tooltip")
             .style("opacity", 0);
 
-        // Load GeoJSON data and merge with states data
-        d3.json("us-states.json", function (json) {
 
-            // Bind the data to the SVG and create one path per GeoJSON feature
-            svg.selectAll("path")
-                .data(json.features)
-                .enter()
-                .append("path")
-                .attr("d", path)
-                .style("stroke", "#fff")
-                .style("stroke-width", "1")
-                .style("fill", function (d) {
+        function drawDotsOnMap(mag, year, month, state, lastYears) {
 
-                    // Get data value
-                    var value = d.properties.visited;
+            // Load GeoJSON data and merge with states data
+            d3.json("us-states.json", function (json) {
 
-                    if (value) {
-                        //If value exists…
-                        return color(value);
-                    } else {
-                        //If value is undefined…
-                        return "rgb(238,238,238)";
+                // Bind the data to the SVG and create one path per GeoJSON feature
+                svg.selectAll("path")
+                    .data(json.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", path)
+                    .style("stroke", "#fff")
+                    .style("stroke-width", "1")
+                    .style("fill", function (d) {
+
+                        // Get data value
+                        var value = d.properties.visited;
+
+                        if (value) {
+                            //If value exists…
+                            return color(value);
+                        } else {
+                            //If value is undefined…
+                            return "rgb(238,238,238)";
+                        }
+                    });
+
+                d3.csv("specific_data1.csv", function (data) {
+
+                    var data_filtered = data;
+
+                    if (mag != null) {
+                        data_filtered = data.filter(function (d) { return d.mag == mag; });
                     }
+
+                    console.log(data_filtered);
+
+                    svg.selectAll("circle")
+                        .data(data_filtered)
+                        .enter()
+                        .append("circle")
+                        .attr("cx", function (d) {
+                            return projection([d.slon, d.slat])[0];
+                        })
+                        .attr("cy", function (d) {
+                            return projection([d.slon, d.slat])[1];
+                        })
+                        .attr("r", 3)
+                        .style("fill", function (d) {
+                            return color(d.mag);
+                        })
+                        .style("opacity", 0.85)
+
+                        // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
+                        // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+                        .on("mouseover", function (d) {
+                            div.transition()
+                                .duration(200)
+                                .style("opacity", .9);
+                            div.text("State: " + d.st + "\nMag: " + d.mag)
+                                .style("left", (d3.event.pageX) + "px")
+                                .style("top", (d3.event.pageY - 28) + "px");
+                        })
+
+                        // fade out tooltip on mouse out               
+                        .on("mouseout", function (d) {
+                            div.transition()
+                                .duration(500)
+                                .style("opacity", 0);
+                        });
+
                 });
 
-            color.domain([0, 1, 2, 3, 4]);
-
-            // Map the cities I have lived in!
-            d3.csv("specific_data1.csv", function (data) {
-
-                svg.selectAll("circle")
-                    .data(data)
-                    .enter()
-                    .append("circle")
-                    .attr("cx", function (d) {
-                        return projection([d.slon, d.slat])[0];
-                    })
-                    .attr("cy", function (d) {
-                        return projection([d.slon, d.slat])[1];
-                    })
-                    .attr("r", 2)
-                    .style("fill", function (d) {
-                        return color(d.mag);
-                    })
-                    .style("opacity", 0.85)
-
-                    // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
-                    // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
-                    .on("mouseover", function (d) {
-                        div.transition()
-                            .duration(200)
-                            .style("opacity", .9);
-                        div.text(d.mag)
-                            .style("left", (d3.event.pageX) + "px")
-                            .style("top", (d3.event.pageY - 28) + "px");
-                    })
-
-                    // fade out tooltip on mouse out               
-                    .on("mouseout", function (d) {
-                        div.transition()
-                            .duration(500)
-                            .style("opacity", 0);
-                    });
             });
 
-            // Modified Legend Code from Mike Bostock: http://bl.ocks.org/mbostock/3888852
-            // var legend = d3.select("#map-div").append("svg")
-            //     .attr("class", "legend")
-            //     .attr("width", 100) //140
-            //     .attr("height", 200)
-            //     .selectAll("g")
-            //     .data(color.domain().slice())
-            //     .enter()
-            //     .append("g")
-            //     .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
+        }
 
-            var legend = d3.select("#map-div").append("svg")
-                .attr("class", "legend")
-                .attr("width", 100)
-                .attr("height", 200)
-                .selectAll("g")
-                .data(color.domain().slice())
-                .enter().append("g")
-                .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
+        drawDotsOnMap(null, null, null, null, null);
 
-            legend.append("rect")
-                .attr("width", 18)
-                .attr("height", 18)
-                .style("fill", color);
+        // -----------------------------------------------------------
+        // ---------------------- LEGEND -----------------------------
+        // Modified Legend Code from Mike Bostock: http://bl.ocks.org/mbostock/3888852
+        var legend = d3.select("#map-div").append("svg")
+            .attr("class", "legend")
+            .attr("width", 100)
+            .attr("height", 200)
+            .selectAll("g")
+            .data(color.domain())
+            .enter().append("g")
+            .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
 
-            legend.append("text")
-                .data(legendText)
-                .attr("x", 24)
-                .attr("y", 9)
-                .attr("dy", ".35em")
-                .text(function (d) { return d; });
-        });
+        legend.append("rect")
+            .attr("width", 18)
+            .attr("height", 18)
+            .style("fill", color);
+
+        legend.append("text")
+            .data(legendText)
+            .attr("x", 24)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .text(function (d) { return d; });
+
+        // -----------------------------------------------------------
+        // ---------------- MAGNITUDE CHECKBOX -----------------------
+        var flagMag = false;
+
+        d3.select("#mag-checkbox").on("change", toggleCheckbox);
+        toggleCheckbox();
+
+        function toggleCheckbox() {
+            flagMag = d3.select("#mag-checkbox").property("checked");
+            // TODO add enable/disable option for slider
+        }
+
+        // -----------------------------------------------------------
+        // ---------------- MAGNITUDE SLIDER -------------------------
+        function updateByMag(magnitude) {
+            if (flagMag) {
+                slider.property("value", magnitude);
+                d3.select("#mag-value").text("Magnitude: " + magnitude);
+                drawDotsOnMap(magnitude, null, null, null, null);
+            }
+        }
+
+        var slider = d3.select("#mag-slider")
+            .append("input")
+            .attr("type", "range")
+            .attr("min", 1)
+            .attr("max", 5)
+            .attr("step", 1)
+            .on("input", function () {
+                var mag = this.value;
+                updateByMag(mag);
+            });
 
     </script>
 
