@@ -44,6 +44,7 @@
 
     <!--Import Google Icon Font-->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
     <!--Import materialize.css-->
     <link type="text/css" rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
@@ -60,7 +61,7 @@
         <div class="nav-wrapper container">
             <a id="logo-container" href="#" class="brand-logo">
                 <i class="large material-icons">menu</i><span style="font-size: 24px;">United States Map Visualization
-                    of Tornadoes</span></a>
+                    of Tornadoes (2014, 2015)</span></a>
             <ul class="right hide-on-med-and-down">
                 <li><i class="large material-icons">settings</i></li>
             </ul>
@@ -73,8 +74,8 @@
                 <div class="col s12 m9 l9">
                     <div class="card-panel" id="map-div">
                         <p align="center" style="font-size: 20px;">What is the <span
-                                style="color: #ff0000">severity</span> of tornadoes in __,
-                            US from ____ to ____?</p>
+                                style="color: #ff0000">severity</span> of tornadoes at __,
+                            US in ____?</p>
                     </div>
                 </div>
                 <div class="col s12 m3 l3">
@@ -89,20 +90,28 @@
                         <p id="mag-value">Magnitude: --</p>
                         <br><br>
                         <label>
-                            <input type="checkbox" class="filled-in" id="yr-month-checkbox" />
+                            <input type="checkbox" class="filled-in" id="time-checkbox" />
                             <span>By Time</span>
                         </label>
-                        <select class="browser-default">
-                            <option value="" disabled selected>Month</option>
-                            <option value="1">Month 1</option>
-                            <option value="2">Month 2</option>
-                            <option value="3">Month 3</option>
+                        <select id="month-select" class="browser-default">
+                            <option value="0" selected>Any month</option>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
                         </select>
-                        <select class="browser-default">
-                            <option value="" disabled selected>Year</option>
-                            <option value="1">Year 1</option>
-                            <option value="2">Year 2</option>
-                            <option value="3">Year 3</option>
+                        <select id="year-select" class="browser-default">
+                            <option value="0" selected>Any year</option>
+                            <option value="2014">2014</option>
+                            <option value="2015">2015</option>
                         </select>
                     </div>
                 </div>
@@ -122,7 +131,9 @@
 
     <script>
 
-        /*  This visualization was made possible by modifying code provided by:
+        /*  
+        
+        This visualization was made possible by modifying code provided by:
 
         Scott Murray, Choropleth example from "Interactive Data Visualization for the Web" 
         https://github.com/alignedleft/d3-book/blob/master/chapter_12/05_choropleth.html   
@@ -131,12 +142,18 @@
         http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
 
         Mike Bostock, Pie Chart Legend
-        http://bl.ocks.org/mbostock/3888852  */
+        http://bl.ocks.org/mbostock/3888852  
+        
+        // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
+        // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+        
+        */
 
 
         //Width and height of map
         var width = 700;
         var height = 350;
+        var globalData = null;
 
         // D3 Projection
         var projection = d3.geo.albersUsa()
@@ -149,10 +166,11 @@
 
         // Define linear scale for output
         var color = d3.scale.linear()
-            .domain([1, 2, 3, 4, 5])
-            .range(["rgb(68,118,4)", "rgb(107,212,37)", "rgb(233,206,44)", "rgb(254,98,29)", "rgb(221,64,58)"]);
+            .domain([0, 1, 2, 3, 5, 6])
+            .range(["rgb(68,118,4)", "rgb(107,212,37)", "rgb(233, 217, 44)", "rgb(233, 179, 44)", "rgb(254,98,29)", "rgb(221,64,58)"]);
 
-        var legendText = ["1", "2", "3", "4", "5"];
+        // Define legend text
+        var legendText = ["0", "1", "2", "3", "4", "5"];
 
         //Create SVG element and append map to the SVG
         var svg = d3.select("#map-div")
@@ -169,85 +187,94 @@
             .attr("class", "tooltip")
             .style("opacity", 0);
 
+        // Load GeoJSON data and merge with states data
+        d3.json("us-states.json", function (json) {
 
-        function drawDotsOnMap(mag, year, month, state, lastYears) {
+            // Bind the data to the SVG and create one path per GeoJSON feature
+            svg.selectAll("path")
+                .data(json.features)
+                .enter()
+                .append("path")
+                .attr("d", path)
+                .style("stroke", "#fff")
+                .style("stroke-width", "1")
+                .style("fill", "rgb(238,238,238)");
 
-            // Load GeoJSON data and merge with states data
-            d3.json("us-states.json", function (json) {
+            // Read the csv data
+            d3.csv("2014_2015.csv", function (data) {
 
-                // Bind the data to the SVG and create one path per GeoJSON feature
-                svg.selectAll("path")
-                    .data(json.features)
+                // Once read, store in global variable
+                globalData = data;
+
+                // Draw all circles
+                svg.selectAll("circle")
+                    .data(data)
                     .enter()
-                    .append("path")
-                    .attr("d", path)
-                    .style("stroke", "#fff")
-                    .style("stroke-width", "1")
+                    .append("circle")
+                    .attr("cx", function (d) {
+                        return projection([d.slon, d.slat])[0];
+                    })
+                    .attr("cy", function (d) {
+                        return projection([d.slon, d.slat])[1];
+                    })
+                    .attr("r", 2)
                     .style("fill", function (d) {
-
-                        // Get data value
-                        var value = d.properties.visited;
-
-                        if (value) {
-                            //If value exists…
-                            return color(value);
-                        } else {
-                            //If value is undefined…
-                            return "rgb(238,238,238)";
-                        }
+                        return color(d.mag);
+                    })
+                    .on("mouseover", function (d) {
+                        div.transition()
+                            .duration(200)
+                            .style("opacity", .9);
+                        div.text("State: " + d.st + "\nMag: " + d.mag)
+                            .style("left", (d3.event.pageX) + "px")
+                            .style("top", (d3.event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function (d) {
+                        div.transition()
+                            .duration(500)
+                            .style("opacity", 0);
                     });
-
-                d3.csv("specific_data1.csv", function (data) {
-
-                    var data_filtered = data;
-
-                    if (mag != null) {
-                        data_filtered = data.filter(function (d) { return d.mag == mag; });
-                    }
-
-                    console.log(data_filtered);
-
-                    svg.selectAll("circle")
-                        .data(data_filtered)
-                        .enter()
-                        .append("circle")
-                        .attr("cx", function (d) {
-                            return projection([d.slon, d.slat])[0];
-                        })
-                        .attr("cy", function (d) {
-                            return projection([d.slon, d.slat])[1];
-                        })
-                        .attr("r", 3)
-                        .style("fill", function (d) {
-                            return color(d.mag);
-                        })
-                        .style("opacity", 0.85)
-
-                        // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
-                        // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
-                        .on("mouseover", function (d) {
-                            div.transition()
-                                .duration(200)
-                                .style("opacity", .9);
-                            div.text("State: " + d.st + "\nMag: " + d.mag)
-                                .style("left", (d3.event.pageX) + "px")
-                                .style("top", (d3.event.pageY - 28) + "px");
-                        })
-
-                        // fade out tooltip on mouse out               
-                        .on("mouseout", function (d) {
-                            div.transition()
-                                .duration(500)
-                                .style("opacity", 0);
-                        });
-
-                });
 
             });
 
-        }
+        });
 
-        drawDotsOnMap(null, null, null, null, null);
+        // Update function to draw new points and remove old points
+        function update(data) {
+
+            var circles = svg.selectAll("circle").data(data);
+            circles.attr("class", "update");
+
+            circles.enter().append("circle")
+                .attr("r", 2)
+                .style("opacity", 0.85);
+
+            circles.exit().remove();
+
+            circles.attr("cx", function (d) {
+                return projection([d.slon, d.slat])[0];
+            })
+                .attr("cy", function (d) {
+                    return projection([d.slon, d.slat])[1];
+                })
+                .style("fill", function (d) {
+                    return color(d.mag);
+                })
+                .on("mouseover", function (d) {
+                    div.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    div.text("State: " + d.st + "\nMag: " + d.mag)
+                        .style("left", (d3.event.pageX) + "px")
+                        .style("top", (d3.event.pageY - 28) + "px");
+                })
+                .on("mouseout", function (d) {
+                    div.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+        }
 
         // -----------------------------------------------------------
         // ---------------------- LEGEND -----------------------------
@@ -277,34 +304,87 @@
         // ---------------- MAGNITUDE CHECKBOX -----------------------
         var flagMag = false;
 
-        d3.select("#mag-checkbox").on("change", toggleCheckbox);
-        toggleCheckbox();
+        d3.select("#mag-checkbox").on("change", toggleMagCheckbox);
 
-        function toggleCheckbox() {
+        function toggleMagCheckbox() {
             flagMag = d3.select("#mag-checkbox").property("checked");
-            // TODO add enable/disable option for slider
+            if (flagMag == false) {
+                d3.select("#mag-value").text("Magnitude: --");
+                update(globalData);
+            } else {
+                d3.select("#time-checkbox").property("checked", false);
+            }
         }
 
         // -----------------------------------------------------------
         // ---------------- MAGNITUDE SLIDER -------------------------
-        function updateByMag(magnitude) {
-            if (flagMag) {
-                slider.property("value", magnitude);
-                d3.select("#mag-value").text("Magnitude: " + magnitude);
-                drawDotsOnMap(magnitude, null, null, null, null);
-            }
-        }
-
         var slider = d3.select("#mag-slider")
             .append("input")
             .attr("type", "range")
-            .attr("min", 1)
+            .attr("min", 0)
             .attr("max", 5)
             .attr("step", 1)
             .on("input", function () {
-                var mag = this.value;
-                updateByMag(mag);
+
+                var magnitude = this.value;
+
+                if (flagMag) {
+                    slider.property("value", magnitude);
+                    d3.select("#mag-value").text("Magnitude: " + magnitude);
+
+                    var data = globalData.filter(function (d) { return d.mag == magnitude; });
+                    update(data);
+                }
             });
+
+        // -----------------------------------------------------------
+        // ---------------- TIME CHECKBOX -----------------------
+        var flagTime = false;
+
+        d3.select("#time-checkbox").on("change", toggleTimeCheckbox);
+
+        function toggleTimeCheckbox() {
+            flagTime = d3.select("#time-checkbox").property("checked");
+            if (flagTime == false) {
+                update(globalData);
+            } else {
+                d3.select("#mag-checkbox").property("checked", false);
+            }
+        }
+
+        // -----------------------------------------------------------
+        // ---------------- TIME SLIDER -------------------------
+        var monthSelect = d3.select("#month-select")
+            .on("change", function () {
+                var month = this.value;
+                var year = yearSelect.property("value");
+                if (flagTime) {
+                    updateMonthYear(month, year);
+                }
+            });
+        
+        var yearSelect = d3.select("#year-select")
+            .on("change", function () {
+                var year = this.value;
+                var month = monthSelect.property("value");
+                if (flagTime) {
+                    updateMonthYear(month, year);
+                }
+            });
+
+        function updateMonthYear(month, year) {
+            var data;
+            if ((month == 0) && (year == 0)) {
+                data = globalData;
+            } else if (year == 0) {
+                data = globalData.filter(function (d) { return d.mo == month; });
+            } else if (month == 0) {
+                data = globalData.filter(function (d) { return d.yr == year; });
+            } else {
+                data = globalData.filter(function (d) { return d.yr == year && d.mo == monthSelect.property("value"); });
+            }
+            update(data);
+        }
 
     </script>
 
