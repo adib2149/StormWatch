@@ -17,8 +17,8 @@
     div.tooltip {
         position: absolute;
         text-align: center;
-        width: 60px;
-        height: 28px;
+        width: 200px;
+        height: 16px;
         padding: 2px;
         font: 12px sans-serif;
         background: white;
@@ -53,6 +53,10 @@
     <!--Let browser know website is optimized for mobile-->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
+
 </head>
 
 <body>
@@ -61,7 +65,7 @@
         <div class="nav-wrapper container">
             <a id="logo-container" href="#" class="brand-logo">
                 <i class="large material-icons">menu</i><span style="font-size: 24px;">United States Map Visualization
-                    of Tornadoes (2014, 2015)</span></a>
+                    of Tornadoes (1957 to 2015)</span></a>
             <ul class="right hide-on-med-and-down">
                 <li><i class="large material-icons">settings</i></li>
             </ul>
@@ -73,45 +77,36 @@
             <div class="row">
                 <div class="col s12 m9 l9">
                     <div class="card-panel" id="map-div">
-                        <p align="center" style="font-size: 20px;">What is the <span
-                                style="color: #ff0000">severity</span> of tornadoes at __,
-                            US in ____?</p>
+                        <p align="center" style="font-size: 20px;">What is the
+                            <span style="color: #ff0000">severity</span>
+                            of tornadoes at
+                            <select class="select2-basic-single" id="state-select" style="width: 25%"></select>,
+                            US
+                            <br>
+                            between
+                            <select class="select2-basic-single" id="year-start-select" style="width: 20%"></select>
+                            and
+                            <select class="select2-basic-single" id="year-end-select" style="width: 20%"></select>
+                            ?</p>
+
+                        <!-- <option value="AL">Alabama</option>
+                                      <option value="WY">Wyoming</option> -->
+
                     </div>
                 </div>
                 <div class="col s12 m3 l3">
                     <div class="card-panel">
                         <p style="font-size: 18px;">Filters</p>
-                        <br><br>
-                        <label>
-                            <input type="checkbox" class="filled-in" id="mag-checkbox" />
-                            <span>By Magnitude</span>
-                        </label>
-                        <div id="mag-slider"></div>
-                        <p id="mag-value">Magnitude: --</p>
-                        <br><br>
-                        <label>
-                            <input type="checkbox" class="filled-in" id="time-checkbox" />
-                            <span>By Time</span>
-                        </label>
-                        <select id="month-select" class="browser-default">
-                            <option value="0" selected>Any month</option>
-                            <option value="1">January</option>
-                            <option value="2">February</option>
-                            <option value="3">March</option>
-                            <option value="4">April</option>
-                            <option value="5">May</option>
-                            <option value="6">June</option>
-                            <option value="7">July</option>
-                            <option value="8">August</option>
-                            <option value="9">September</option>
-                            <option value="10">October</option>
-                            <option value="11">November</option>
-                            <option value="12">December</option>
-                        </select>
-                        <select id="year-select" class="browser-default">
-                            <option value="0" selected>Any year</option>
-                            <option value="2014">2014</option>
-                            <option value="2015">2015</option>
+                        <p style="font-size: 14px;" id="mag-value">Magnitude: --</p>
+                        <!-- <div id="mag-slider"></div> -->
+                        <select id="mag-select" class="browser-default">
+                            <option value="-1" selected>Any magnitude</option>
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
                         </select>
                     </div>
                 </div>
@@ -128,6 +123,38 @@
 
 
     <script src="https://d3js.org/d3.v3.min.js"></script>
+
+
+    <script>
+        $(document).ready(function () {
+            $('.select2-basic-single').select2();
+        });
+
+        $('#year-start-select').on('select2:select', function (e) {
+            var magnitude = $("#mag-select").val();
+            var yearStart = e.params.data.text;
+            var yearEnd = $("#year-end-select").val();
+            var state = $("#state-select").val();
+            getValuesAndUpdateMap(magnitude, yearStart, yearEnd, state);
+        });
+
+        $('#year-end-select').on('select2:select', function (e) {
+            var magnitude = $("#mag-select").val();
+            var yearStart = $("#year-start-select").val();
+            var yearEnd = e.params.data.text;
+            var state = $("#state-select").val();
+            getValuesAndUpdateMap(magnitude, yearStart, yearEnd, state);
+        });
+
+        $('#state-select').on('select2:select', function (e) {
+            var magnitude = $("#mag-select").val();
+            var yearStart = $("#year-start-select").val();
+            var yearEnd = $("#year-end-select").val();
+            var state = e.params.data.text;
+            getValuesAndUpdateMap(magnitude, yearStart, yearEnd, state);
+        });
+
+    </script>
 
     <script>
 
@@ -187,6 +214,46 @@
             .attr("class", "tooltip")
             .style("opacity", 0);
 
+        // Prepare select options for years
+        var yearSelect = document.getElementById('year-start-select');
+        for (var i = 1957; i <= 2015; i++) {
+            var optn = document.createElement("OPTION");
+            optn.text = i;
+            optn.value = i;
+            if (i == 1990) {
+                optn.setAttribute("selected", true);
+            }
+            yearSelect.options.add(optn);
+        }
+
+        var yearSelect = document.getElementById('year-end-select');
+        for (var i = 1957; i <= 2015; i++) {
+            var optn = document.createElement("OPTION");
+            optn.text = i;
+            optn.value = i;
+            if (i == 2015) {
+                optn.setAttribute("selected", true);
+            }
+            yearSelect.options.add(optn);
+        }
+
+        // Prepare select options for states
+        d3.csv("states.csv", function (error, data) {
+
+            var stateSelect = document.getElementById('state-select');
+            data.forEach(element => {
+                var optn = document.createElement("OPTION");
+                optn.text = element.state;
+                optn.value = element.value;
+                if (element.value == "WI") {
+                    optn.setAttribute("selected", true);
+                }
+                stateSelect.options.add(optn);
+            });
+        });
+
+
+
         // Load GeoJSON data and merge with states data
         d3.json("us-states.json", function (json) {
 
@@ -201,10 +268,14 @@
                 .style("fill", "rgb(238,238,238)");
 
             // Read the csv data
-            d3.csv("2014_2015.csv", function (data) {
+            d3.csv("data.csv", function (data) {
 
                 // Once read, store in global variable
                 globalData = data;
+
+                data = globalData.filter(function (d) {
+                    return d.yr == 2015;
+                });
 
                 // Draw all circles
                 svg.selectAll("circle")
@@ -225,7 +296,7 @@
                         div.transition()
                             .duration(200)
                             .style("opacity", .9);
-                        div.text("State: " + d.st + "\nMag: " + d.mag)
+                        div.text("Mag:" + d.mag + ", Year:" + d.yr + ", State:" + d.st)
                             .style("left", (d3.event.pageX) + "px")
                             .style("top", (d3.event.pageY - 28) + "px");
                     })
@@ -238,6 +309,41 @@
             });
 
         });
+
+        // Function to redraw dots
+        function getValuesAndUpdateMap(magnitude, yearStart, yearEnd, state) {
+            console.log(magnitude);
+            console.log(yearStart);
+            console.log(yearEnd);
+            console.log(state);
+            console.log("----------------------");
+            var data = getData(magnitude, yearStart, yearEnd, state);
+            update(data);
+        }
+
+        // Find data based on params
+        function getData(magnitude, yearStart, yearEnd, state) {
+
+            var data = globalData;
+
+            if (magnitude != -1) {
+                data = data.filter(function (d) { return d.mag == magnitude; });
+            }
+
+            if (yearStart != -1) {
+                data = data.filter(function (d) { return d.yr >= yearStart; });
+            }
+
+            if (yearEnd != -1) {
+                data = data.filter(function (d) { return d.yr <= yearEnd; });
+            }
+
+            if (state != -1) {
+                data = data.filter(function (d) { return d.st == state; });
+            }
+
+            return data;
+        }
 
         // Update function to draw new points and remove old points
         function update(data) {
@@ -264,7 +370,7 @@
                     div.transition()
                         .duration(200)
                         .style("opacity", .9);
-                    div.text("State: " + d.st + "\nMag: " + d.mag)
+                    div.text("Mag:" + d.mag + ", Year:" + d.yr + ", State:" + d.st)
                         .style("left", (d3.event.pageX) + "px")
                         .style("top", (d3.event.pageY - 28) + "px");
                 })
@@ -301,90 +407,44 @@
             .text(function (d) { return d; });
 
         // -----------------------------------------------------------
-        // ---------------- MAGNITUDE CHECKBOX -----------------------
-        var flagMag = false;
-
-        d3.select("#mag-checkbox").on("change", toggleMagCheckbox);
-
-        function toggleMagCheckbox() {
-            flagMag = d3.select("#mag-checkbox").property("checked");
-            if (flagMag == false) {
-                d3.select("#mag-value").text("Magnitude: --");
-                update(globalData);
-            } else {
-                d3.select("#time-checkbox").property("checked", false);
-            }
-        }
-
-        // -----------------------------------------------------------
-        // ---------------- MAGNITUDE SLIDER -------------------------
-        var slider = d3.select("#mag-slider")
-            .append("input")
-            .attr("type", "range")
-            .attr("min", 0)
-            .attr("max", 5)
-            .attr("step", 1)
-            .on("input", function () {
+        // ---------------- MAGNITUDE DROPDOWN -------------------------
+        var magSelect = d3.select("#mag-select")
+            .on("change", function () {
+                magSelect.property("value", this.value);
+                if (this.value == -1) {
+                    d3.select("#mag-value").text("Magnitude: --");
+                } else {
+                    d3.select("#mag-value").text("Magnitude: " + this.value);
+                }
 
                 var magnitude = this.value;
-
-                if (flagMag) {
-                    slider.property("value", magnitude);
-                    d3.select("#mag-value").text("Magnitude: " + magnitude);
-
-                    var data = globalData.filter(function (d) { return d.mag == magnitude; });
-                    update(data);
-                }
+                var yearStart = $("#year-start-select").val();
+                var yearEnd = $("#year-end-select").val();
+                var state = $("#state-select").val();
+                getValuesAndUpdateMap(magnitude, yearStart, yearEnd, state); 
             });
 
-        // -----------------------------------------------------------
-        // ---------------- TIME CHECKBOX -----------------------
-        var flagTime = false;
+        // // -----------------------------------------------------------
+        // // ---------------- YEAR DROPDOWN -------------------------
+        // var yearStartSelect = d3.select("#year-start-select")
+        //     .on("change", function () {
+        //         yearStartSelect.property("value", this.value);
+        //         getValuesAndUpdateMap();
+        //     });
 
-        d3.select("#time-checkbox").on("change", toggleTimeCheckbox);
+        // var yearEndSelect = d3.select("#year-end-select")
+        //     .on("change", function () {
+        //         yearEndSelect.property("value", this.value);
+        //         getValuesAndUpdateMap();
+        //     });
 
-        function toggleTimeCheckbox() {
-            flagTime = d3.select("#time-checkbox").property("checked");
-            if (flagTime == false) {
-                update(globalData);
-            } else {
-                d3.select("#mag-checkbox").property("checked", false);
-            }
-        }
-
-        // -----------------------------------------------------------
-        // ---------------- TIME SLIDER -------------------------
-        var monthSelect = d3.select("#month-select")
-            .on("change", function () {
-                var month = this.value;
-                var year = yearSelect.property("value");
-                if (flagTime) {
-                    updateMonthYear(month, year);
-                }
-            });
-        
-        var yearSelect = d3.select("#year-select")
-            .on("change", function () {
-                var year = this.value;
-                var month = monthSelect.property("value");
-                if (flagTime) {
-                    updateMonthYear(month, year);
-                }
-            });
-
-        function updateMonthYear(month, year) {
-            var data;
-            if ((month == 0) && (year == 0)) {
-                data = globalData;
-            } else if (year == 0) {
-                data = globalData.filter(function (d) { return d.mo == month; });
-            } else if (month == 0) {
-                data = globalData.filter(function (d) { return d.yr == year; });
-            } else {
-                data = globalData.filter(function (d) { return d.yr == year && d.mo == monthSelect.property("value"); });
-            }
-            update(data);
-        }
+        // // -----------------------------------------------------------
+        // // ---------------- STATE DROPDOWN -------------------------
+        // var stateSelect = d3.select("#state-select")
+        //     .on("change", function () {
+        //         stateSelect.property("value", this.value);
+        //         getValuesAndUpdateMap(this.value);
+        //     });
 
     </script>
 
