@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+  http://bl.ocks.org/michellechandra/0b2ce4923dc9b5809922
+  https://materializecss.com/
+-->
+
+<meta charset="utf-8">
+<style type="text/css">
+    /* On mouse hover, lighten state color */
+    path:hover {
+        fill-opacity: .7;
+    }
+
+    /* Style for Custom Tooltip */
+    div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 200px;
+        height: 16px;
+        padding: 2px;
+        font: 12px sans-serif;
+        background: white;
+        border: 0px;
+        border-radius: 8px;
+        pointer-events: none;
+    }
+
+    /* Legend Font Style */
+    body {
+        font: 11px sans-serif;
+    }
+
+    /* Legend Position Style */
+    .legend {
+        position: absolute;
+        left: 800px;
+        top: 350px;
+    }
+</style>
+
+<head>
+
+    <!--Import Google Icon Font-->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!--Import materialize.css-->
+    <link type="text/css" rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+        media="screen,projection" />
+
+    <!--Let browser know website is optimized for mobile-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+</head>
+
+<body>
+
+    <nav class="green darken-3" role="navigation">
+        <div class="nav-wrapper container">
+            <a id="logo-container" href="#" class="brand-logo">
+                <i class="large material-icons">menu</i><span style="font-size: 24px;">United States Map Visualization
+                    of Tornadoes (1957 to 2015)</span></a>
+            <ul class="right hide-on-med-and-down">
+                <li><i class="large material-icons">settings</i></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="section">
+            <div class="row">
+                <div class="col s12 m9 l9">
+                    <div class="card-panel" id="map-div">
+                        <p align="center" style="font-size: 20px;">What is the <span
+                                style="color: #ff0000">severity</span> of tornadoes in the US?</p>
+                    </div>
+                </div>
+                <div class="col s12 m3 l3">
+                    <div class="card-panel">
+                        <p style="font-size: 18px;">Filters</p>
+                        <p style="font-size: 14px;" id="mag-value">Magnitude: --</p>
+                        <!-- <div id="mag-slider"></div> -->
+                        <select id="mag-select" class="browser-default">
+                            <option value="-1" selected>Any magnitude</option>
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                        <p style="font-size: 14px;" id="year-start-value">Start year: --</p>
+                        <select id="year-start-select" class="browser-default"></select>
+                        <p style="font-size: 14px;" id="year-end-value">End year: --</p>
+                        <select id="year-end-select" class="browser-default"></select>
+                        <p style="font-size: 14px;" id="state-value">State: --</p>
+                        <select id="state-select" class="browser-default"></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+
+
+
+
+
+
+
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+
+    <script>
+
+        /*  
+        
+        This visualization was made possible by modifying code provided by:
+
+        Scott Murray, Choropleth example from "Interactive Data Visualization for the Web" 
+        https://github.com/alignedleft/d3-book/blob/master/chapter_12/05_choropleth.html   
+                
+        Malcolm Maclean, tooltips example tutorial
+        http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+
+        Mike Bostock, Pie Chart Legend
+        http://bl.ocks.org/mbostock/3888852  
+        
+        // Modification of custom tooltip code provided by Malcolm Maclean, "D3 Tips and Tricks" 
+        // http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+        
+        */
+
+
+        //Width and height of map
+        var width = 700;
+        var height = 350;
+        var globalData = null;
+
+        // D3 Projection
+        var projection = d3.geo.albersUsa()
+            .translate([width / 2, height / 2])    // translate to center of screen
+            .scale([700]);          // scale things down so see entire US
+
+        // Define path generator
+        var path = d3.geo.path()               // path generator that will convert GeoJSON to SVG paths
+            .projection(projection);  // tell path generator to use albersUsa projection
+
+        // Define linear scale for output
+        var color = d3.scale.linear()
+            .domain([0, 1, 2, 3, 5, 6])
+            .range(["rgb(68,118,4)", "rgb(107,212,37)", "rgb(233, 217, 44)", "rgb(233, 179, 44)", "rgb(254,98,29)", "rgb(221,64,58)"]);
+
+        // Define legend text
+        var legendText = ["0", "1", "2", "3", "4", "5"];
+
+        //Create SVG element and append map to the SVG
+        var svg = d3.select("#map-div")
+            .append("svg")
+            // .attr("width", width)
+            // .attr("height", height)
+            .attr("preserveAspectRatio", "none")
+            .attr("viewBox", "0 0 700 350")
+            .attr("align", "center");
+
+        // Append Div for tooltip to SVG
+        var div = d3.select("#map-div")
+            .append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        // Prepare select options for years
+        var yearSelect = document.getElementById('year-start-select');
+        for (var i = 2015; i >= 1957; i--) {
+            var optn = document.createElement("OPTION");
+            optn.text = i;
+            optn.value = i;
+            if (i == 2015) {
+                optn.setAttribute("selected", true);
+            }
+            yearSelect.options.add(optn);
+        }
+
+        var yearSelect = document.getElementById('year-end-select');
+        for (var i = 2015; i >= 1957; i--) {
+            var optn = document.createElement("OPTION");
+            optn.text = i;
+            optn.value = i;
+            if (i == 2017) {
+                optn.setAttribute("selected", true);
+            }
+            yearSelect.options.add(optn);
+        }
+
+        // Prepare select options for states
+        d3.csv("states.csv", function (error, data) {
+            d3.select("#state-select")
+                .selectAll("option")
+                .data(data)
+                .enter()
+                .append("option")
+                .attr("value", function (d) { return d.value; })
+                .text(function (d) { return d.state; });
+        });
+
+        // Load GeoJSON data and merge with states data
+        d3.json("us-states.json", function (json) {
+
+            // Bind the data to the SVG and create one path per GeoJSON feature
+            svg.selectAll("path")
+                .data(json.features)
+                .enter()
+                .append("path")
+                .attr("d", path)
+                .style("stroke", "#fff")
+                .style("stroke-width", "1")
+                .style("fill", "rgb(238,238,238)");
+
+            // Read the csv data
+            d3.csv("data.csv", function (data) {
+
+                // Once read, store in global variable
+                globalData = data;
+
+                data = globalData.filter(function (d) {
+                    return d.yr == 2015;
+                });
+
+                // Draw all circles
+                svg.selectAll("circle")
+                    .data(data)
+                    .enter()
+                    .append("circle")
+                    .attr("cx", function (d) {
+                        return projection([d.slon, d.slat])[0];
+                    })
+                    .attr("cy", function (d) {
+                        return projection([d.slon, d.slat])[1];
+                    })
+                    .attr("r", 2)
+                    .style("fill", function (d) {
+                        return color(d.mag);
+                    })
+                    .on("mouseover", function (d) {
+                        div.transition()
+                            .duration(200)
+                            .style("opacity", .9);
+                        div.text("Mag:" + d.mag + ", Year:" + d.yr + ", State:" + d.st)
+                            .style("left", (d3.event.pageX) + "px")
+                            .style("top", (d3.event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function (d) {
+                        div.transition()
+                            .duration(500)
+                            .style("opacity", 0);
+                    });
+
+            });
+
+        });
+
+        // Function to redraw dots
+        function getValuesAndUpdateMap() {
+            var magnitude = d3.select("#mag-select").node().value;
+            var yearStart = d3.select("#year-start-select").node().value;
+            var yearEnd = d3.select("#year-end-select").node().value;
+            var state = d3.select("#state-select").node().value;
+            var data = getData(magnitude, yearStart, yearEnd, state);
+            update(data);
+        }
+
+        // Find data based on params
+        function getData(magnitude, yearStart, yearEnd, state) {
+
+            var data = globalData;
+
+            if (magnitude != -1) {
+                data = data.filter(function (d) { return d.mag == magnitude; });
+            }
+
+            if (yearStart != -1) {
+                data = data.filter(function (d) { return d.yr >= yearStart; });
+            }
+
+            if (yearEnd != -1) {
+                data = data.filter(function (d) { return d.yr <= yearEnd; });
+            }
+
+            if (state != -1) {
+                data = data.filter(function (d) { return d.st == state; });
+            }
+
+            return data;
+        }
+
+        // Update function to draw new points and remove old points
+        function update(data) {
+
+            var circles = svg.selectAll("circle").data(data);
+            circles.attr("class", "update");
+
+            circles.enter().append("circle")
+                .attr("r", 2)
+                .style("opacity", 0.85);
+
+            circles.exit().remove();
+
+            circles.attr("cx", function (d) {
+                return projection([d.slon, d.slat])[0];
+            })
+                .attr("cy", function (d) {
+                    return projection([d.slon, d.slat])[1];
+                })
+                .style("fill", function (d) {
+                    return color(d.mag);
+                })
+                .on("mouseover", function (d) {
+                    div.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    div.text("Mag:" + d.mag + ", Year:" + d.yr + ", State:" + d.st)
+                        .style("left", (d3.event.pageX) + "px")
+                        .style("top", (d3.event.pageY - 28) + "px");
+                })
+                .on("mouseout", function (d) {
+                    div.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+        }
+
+        // -----------------------------------------------------------
+        // ---------------------- LEGEND -----------------------------
+        // Modified Legend Code from Mike Bostock: http://bl.ocks.org/mbostock/3888852
+        var legend = d3.select("#map-div").append("svg")
+            .attr("class", "legend")
+            .attr("width", 100)
+            .attr("height", 200)
+            .selectAll("g")
+            .data(color.domain())
+            .enter().append("g")
+            .attr("transform", function (d, i) { return "translate(0," + i * 20 + ")"; });
+
+        legend.append("rect")
+            .attr("width", 18)
+            .attr("height", 18)
+            .style("fill", color);
+
+        legend.append("text")
+            .data(legendText)
+            .attr("x", 24)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .text(function (d) { return d; });
+
+        // -----------------------------------------------------------
+        // ---------------- MAGNITUDE DROPDOWN -------------------------
+        var magSelect = d3.select("#mag-select")
+            .on("change", function () {
+                magSelect.property("value", this.value);
+                getValuesAndUpdateMap();
+                if (this.value == -1) {
+                    d3.select("#mag-value").text("Magnitude: --");
+                } else {
+                    d3.select("#mag-value").text("Magnitude: " + this.value);
+                }
+            });
+
+        // -----------------------------------------------------------
+        // ---------------- YEAR DROPDOWN -------------------------
+        var yearStartSelect = d3.select("#year-start-select")
+            .on("change", function () {
+                yearStartSelect.property("value", this.value);
+                getValuesAndUpdateMap();
+                d3.select("#year-start-value").text("Start year: " + this.value);
+            });
+
+        var yearEndSelect = d3.select("#year-end-select")
+            .on("change", function () {
+                yearEndSelect.property("value", this.value);
+                getValuesAndUpdateMap();
+                d3.select("#year-end-value").text("End year: " + this.value);
+            });
+
+        // -----------------------------------------------------------
+        // ---------------- STATE DROPDOWN -------------------------
+        var stateSelect = d3.select("#state-select")
+            .on("change", function () {
+                stateSelect.property("value", this.value);
+                getValuesAndUpdateMap();
+                d3.select("#state-value").text("State: " + this.value);
+            });
+
+    </script>
+
+    <!--JavaScript at end of body for optimized loading-->
+    <script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+</body>
+
+</html>
